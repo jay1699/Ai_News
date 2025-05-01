@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI News Aggregator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      background: #f7f7f7;
+    }
+    .container {
+      max-width: 500px;
+      margin: auto;
+      background: white;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    input, button {
+      width: 100%;
+      padding: 0.7rem;
+      margin: 0.5rem 0;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>AI News Aggregator</h2>
+
+    <div id="authSection">
+      <input type="text" id="username" placeholder="Username" />
+      <input type="password" id="password" placeholder="Password" />
+      <button onclick="login()">Login</button>
+      <button onclick="signup()">Signup</button>
+    </div>
+
+    <div id="mainSection" class="hidden">
+      <p id="welcome"></p>
+      <button onclick="checkCredits()">Check Credits</button>
+      <button onclick="generateNews()">Generate AI News</button>
+      <button onclick="logout()">Logout</button>
+      <p><strong>Your Credits:</strong> <span id="credits"></span></p>
+      <div id="newsSection">
+        <strong>AI-Generated News:</strong>
+        <pre id="newsContent"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "http://localhost:8000";
+    let token = localStorage.getItem("token");
+
+    function showMain(username) {
+      document.getElementById("authSection").classList.add("hidden");
+      document.getElementById("mainSection").classList.remove("hidden");
+      document.getElementById("welcome").innerText = `Welcome, ${username}!`;
+    }
+
+    function showLogin() {
+      document.getElementById("authSection").classList.remove("hidden");
+      document.getElementById("mainSection").classList.add("hidden");
+    }
+
+    async function login() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+
+      const res = await fetch(`${API_BASE}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        token = data.access_token;
+        localStorage.setItem("token", token);
+        showMain(username);
+      } else {
+        alert("Login failed");
+      }
+    }
+
+    async function signup() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+
+      const res = await fetch(`${API_BASE}/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (res.ok) {
+        alert("Signup successful, now log in.");
+      } else {
+        alert("Signup failed");
+      }
+    }
+
+    async function checkCredits() {
+      const res = await fetch(`${API_BASE}/credits`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        document.getElementById("credits").innerText = data.credits;
+      } else {
+        alert("Error checking credits");
+      }
+    }
+
+    async function generateNews() {
+      const res = await fetch(`${API_BASE}/ai-news`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        document.getElementById("newsContent").innerText = data.news;
+        checkCredits(); // Refresh credits
+      } else {
+        alert("Error generating news (maybe out of credits?)");
+      }
+    }
+
+    function logout() {
+      token = null;
+      localStorage.removeItem("token");
+      showLogin();
+    }
+
+    // Auto-login if token exists
+    if (token) {
+      showMain("User");
+    }
+  </script>
+</body>
+</html>

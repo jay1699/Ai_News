@@ -1,0 +1,468 @@
+<!--<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI News Aggregator</title>
+    <style>
+        .hidden {
+            display: none;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+        .button-container {
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #ai-news, #credits {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 10px 0;
+            min-height: 50px;
+        }
+    </style>
+</head>
+<body>
+    <h1>AI News Aggregator</h1>
+
+    <div id="auth" class="hidden">
+        <h2>Sign Up</h2>
+        <form id="signup-form">
+            <input type="text" id="signup-username" placeholder="Username" required>
+            <input type="text" id="signup-fullname" placeholder="Full Name">
+            <input type="password" id="signup-password" placeholder="Password" required>
+            <button type="submit">Sign Up</button>
+        </form>
+
+        <h2>Login</h2>
+        <form id="login-form">
+            <input type="text" id="login-username" placeholder="Username" required>
+            <input type="password" id="login-password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+        <p id="auth-message"></p>
+    </div>
+
+    <div id="user-section" class="hidden">
+        <h2>Welcome, <span id="username-display"></span>!</h2>
+        
+        <div class="button-container">
+            <button id="check-credits">Check Credits</button>
+            <button id="get-ai-news">Generate AI News</button>
+            <button id="logout">Logout</button>
+        </div>
+
+        <div id="credits-section">
+            <h3>Your Credits</h3>
+            <p id="credits">Click "Check Credits" to see your balance</p>
+        </div>
+
+        <div id="ai-news-section">
+            <h3>AI-Generated News</h3>
+            <p id="ai-news">Click "Generate AI News" to get the latest news</p>
+        </div>
+    </div>
+
+    <script>
+        let token = '';
+        let currentUsername = '';
+
+        // Check if user is already logged in
+        function checkLoginStatus() {
+            const storedToken = localStorage.getItem('token');
+            const storedUsername = localStorage.getItem('username');
+            if (storedToken && storedUsername) {
+                token = storedToken;
+                currentUsername = storedUsername;
+                showUserSection();
+            } else {
+                showAuthSection();
+            }
+        }
+
+        function showAuthSection() {
+            document.getElementById('auth').classList.remove('hidden');
+            document.getElementById('user-section').classList.add('hidden');
+        }
+
+        function showUserSection() {
+            document.getElementById('auth').classList.add('hidden');
+            document.getElementById('user-section').classList.remove('hidden');
+            document.getElementById('username-display').textContent = currentUsername;
+        }
+
+        // Signup handler
+        document.getElementById("signup-form").addEventListener("submit", function(event) {
+            event.preventDefault();
+            const username = document.getElementById("signup-username").value;
+            const full_name = document.getElementById("signup-fullname").value;
+            const password = document.getElementById("signup-password").value;
+
+            fetch("http://localhost:8000/auth/signup", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, full_name, password }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("auth-message").innerText = data.message || "Signup successful, now login.";
+                document.getElementById("auth-message").className = "success";
+                document.getElementById("signup-form").reset();  // Clear the form on success
+            })
+            .catch(() => {
+                document.getElementById("auth-message").innerText = "Signup failed.";
+                document.getElementById("auth-message").className = "error";
+            });
+        });
+
+        // Login handler
+        document.getElementById("login-form").addEventListener("submit", function(event) {
+            event.preventDefault();
+            const username = document.getElementById("login-username").value;
+            const password = document.getElementById("login-password").value;
+
+            fetch("http://localhost:8000/auth/token", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({ username, password }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.access_token) {
+                    token = data.access_token;
+                    currentUsername = username;
+                    localStorage.setItem('token', token);
+                    localStorage.setItem('username', username);
+                    showUserSection();
+                    document.getElementById("login-form").reset();  // Clear the form on success
+                } else {
+                    document.getElementById("auth-message").innerText = "Login failed.";
+                    document.getElementById("auth-message").className = "error";
+                }
+            })
+            .catch(() => {
+                document.getElementById("auth-message").innerText = "Login failed.";
+                document.getElementById("auth-message").className = "error";
+            });
+        });
+
+        // Check Credits button handler
+        document.getElementById("check-credits").addEventListener("click", function() {
+            document.getElementById("credits").innerText = "Loading credits...";
+            fetch("http://localhost:8000/credits", {
+                headers: { "Authorization": `Bearer ${token}` },
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data && data.credits !== undefined) {
+                    document.getElementById("credits").innerText = `You have ${data.credits} credits remaining`;
+                } else {
+                    document.getElementById("credits").innerText = "Error loading credits";
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById("credits").innerText = `Error loading credits: ${error.message}`;
+            });
+        });
+
+        // Generate AI News button handler
+        document.getElementById("get-ai-news").addEventListener("click", function() {
+            document.getElementById("ai-news").innerText = "Generating news...";
+            fetch("http://localhost:8000/ai-news", {
+                headers: { "Authorization": `Bearer ${token}` },
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data && data.ai_news) {
+                    document.getElementById("ai-news").innerText = data.ai_news;
+                    // Update credits after successful news generation
+                    document.getElementById("check-credits").click();
+                } else {
+                    document.getElementById("ai-news").innerText = "No news generated. Please try again.";
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById("ai-news").innerText = `Error generating news: ${error.message}`;
+            });
+        });
+
+        // Logout handler
+        document.getElementById("logout").addEventListener("click", function() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('username');
+            token = '';
+            currentUsername = '';
+            showAuthSection();
+        });
+
+        // Initialize the page
+        checkLoginStatus();
+    </script>
+</body>
+</html> -->
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI News Aggregator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 30px;
+            max-width: 600px;
+            margin: auto;
+            background-color: #f9f9f9;
+        }
+
+        h1, h2, h3 {
+            color: #333;
+        }
+
+        input, button {
+            padding: 10px;
+            margin: 5px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .button-container {
+            margin: 20px 0;
+        }
+
+        button {
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .error {
+            color: red;
+        }
+
+        .success {
+            color: green;
+        }
+
+        #ai-news, #credits {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #fff;
+            margin-top: 10px;
+            min-height: 50px;
+        }
+    </style>
+</head>
+<body>
+    <h1>AI News Aggregator</h1>
+
+    <div id="auth" class="hidden">
+        <h2>Sign Up</h2>
+        <form id="signup-form">
+            <input type="text" id="signup-username" placeholder="Username" required>
+            <input type="text" id="signup-fullname" placeholder="Full Name">
+            <input type="password" id="signup-password" placeholder="Password" required>
+            <button type="submit">Sign Up</button>
+        </form>
+
+        <h2>Login</h2>
+        <form id="login-form">
+            <input type="text" id="login-username" placeholder="Username" required>
+            <input type="password" id="login-password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+        <p id="auth-message"></p>
+    </div>
+
+    <div id="user-section" class="hidden">
+        <h2>Welcome, <span id="username-display"></span>!</h2>
+
+        <div class="button-container">
+            <button id="check-credits">Check Credits</button>
+            <button id="get-ai-news">Generate AI News</button>
+            <button id="logout">Logout</button>
+        </div>
+
+        <div>
+            <h3>Your Credits</h3>
+            <p id="credits">Click "Check Credits" to see your balance.</p>
+        </div>
+
+        <div>
+            <h3>AI-Generated News</h3>
+            <p id="ai-news">Click "Generate AI News" to get the latest headlines.</p>
+        </div>
+    </div>
+
+    <script>
+        let token = '';
+        let currentUsername = '';
+
+        function checkLoginStatus() {
+            const storedToken = localStorage.getItem('token');
+            const storedUsername = localStorage.getItem('username');
+            if (storedToken && storedUsername) {
+                token = storedToken;
+                currentUsername = storedUsername;
+                showUserSection();
+            } else {
+                showAuthSection();
+            }
+        }
+
+        function showAuthSection() {
+            document.getElementById('auth').classList.remove('hidden');
+            document.getElementById('user-section').classList.add('hidden');
+        }
+
+        function showUserSection() {
+            document.getElementById('auth').classList.add('hidden');
+            document.getElementById('user-section').classList.remove('hidden');
+            document.getElementById('username-display').textContent = currentUsername;
+        }
+
+        // Signup
+        document.getElementById("signup-form").addEventListener("submit", function(event) {
+            event.preventDefault();
+            const username = document.getElementById("signup-username").value;
+            const full_name = document.getElementById("signup-fullname").value;
+            const password = document.getElementById("signup-password").value;
+
+            fetch("http://localhost:8000/auth/signup", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, full_name, password }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("auth-message").innerText = data.message || "Signup successful. You can now log in.";
+                document.getElementById("auth-message").className = "success";
+                document.getElementById("signup-form").reset();
+            })
+            .catch(() => {
+                document.getElementById("auth-message").innerText = "Signup failed.";
+                document.getElementById("auth-message").className = "error";
+            });
+        });
+
+        // Login
+        document.getElementById("login-form").addEventListener("submit", function(event) {
+            event.preventDefault();
+            const username = document.getElementById("login-username").value;
+            const password = document.getElementById("login-password").value;
+
+            fetch("http://localhost:8000/auth/token", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({ username, password }),
+            })
+            .then(async response => {
+                const data = await response.json();
+                if (response.ok && data.access_token) {
+                    token = data.access_token;
+                    currentUsername = username;
+                    localStorage.setItem("token", token);
+                    localStorage.setItem("username", username);
+                    showUserSection();
+                    document.getElementById("login-form").reset();
+                } else {
+                    document.getElementById("auth-message").innerText = data.detail || "Login failed.";
+                    document.getElementById("auth-message").className = "error";
+                }
+            })
+            .catch(() => {
+                document.getElementById("auth-message").innerText = "Login failed. Network error.";
+                document.getElementById("auth-message").className = "error";
+            });
+        });
+
+        // Check credits
+        document.getElementById("check-credits").addEventListener("click", function() {
+            document.getElementById("credits").innerText = "Loading credits...";
+            fetch("http://localhost:8000/credits", {
+                headers: { "Authorization": `Bearer ${token}` },
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("credits").innerText = `You have ${data.credits} credits remaining.`;
+            })
+            .catch(() => {
+                document.getElementById("credits").innerText = "Error loading credits.";
+            });
+        });
+
+        // Generate AI News
+        document.getElementById("get-ai-news").addEventListener("click", function() {
+            document.getElementById("ai-news").innerText = "Generating news...";
+            fetch("http://localhost:8000/ai-news", {
+                headers: { "Authorization": `Bearer ${token}` },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.ai_news) {
+                    document.getElementById("ai-news").innerText = data.ai_news;
+                    document.getElementById("check-credits").click();
+                } else {
+                    document.getElementById("ai-news").innerText = "No news generated.";
+                }
+            })
+            .catch(() => {
+                document.getElementById("ai-news").innerText = "Error generating news.";
+            });
+        });
+
+        // Logout
+        document.getElementById("logout").addEventListener("click", function() {
+            localStorage.removeItem("token");
+            localStorage.removeItem("username");
+            token = '';
+            currentUsername = '';
+            showAuthSection();
+        });
+
+        // Init
+        checkLoginStatus();
+    </script>
+</body>
+</html>
+
